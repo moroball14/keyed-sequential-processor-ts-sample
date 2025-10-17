@@ -1,0 +1,63 @@
+services:
+  redis:
+    image: "redis:7-alpine"
+    ports:
+      - "6379:6379"
+    command: redis-server --save "" --appendonly no
+
+  pubsub-emulator:
+    image: gcr.io/google.com/cloudsdktool/cloud-sdk:emulators
+    ports:
+      - "8085:8085"
+    command: gcloud beta emulators pubsub start --project=local-project --host-port=0.0.0.0:8085
+
+  dispatcher:
+    build: ./dispatcher
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - REDIS_HOST=redis
+      - PUBSUB_EMULATOR_HOST=pubsub-emulator:8085
+      - PUBSUB_PROJECT_ID=local-project
+      - WORKER_URL=http://worker:8081
+    depends_on:
+      - redis
+      - pubsub-emulator
+
+  worker:
+    build: ./worker
+    ports:
+      - "8081:8081"
+    environment:
+      - PORT=8081
+      - REDIS_HOST=redis
+      - SELF_URL=http://worker:8081
+    depends_on:
+      - redis
+
+  setup:
+    build:
+      context: .
+      dockerfile: scripts/Dockerfile
+    working_dir: /usr/src/app
+    environment:
+      - PUBSUB_EMULATOR_HOST=pubsub-emulator:8085
+    command: npm run setup
+    depends_on:
+      - pubsub-emulator
+    profiles:
+      - tools
+
+  send:
+    build:
+      context: .
+      dockerfile: scripts/Dockerfile
+    working_dir: /usr/src/app
+    environment:
+      - PUBSUB_EMULATOR_HOST=pubsub-emulator:8085
+    command: npm run send
+    depends_on:
+      - pubsub-emulator
+    profiles:
+      - tools
