@@ -20,15 +20,8 @@ async function publishEvent(eventId: string, data: object) {
 async function main() {
   console.log('Sending a batch of test events...');
 
-  const events = [
-    { id: 'AAAAAAAA', data: { step: 1 } },
-    { id: 'BBBBBBBB', data: { step: 1 } },
-    { id: 'AAAAAAAA', data: { step: 2 } },
-    { id: 'CCCCCCCC', data: { step: 1 } },
-    { id: 'BBBBBBBB', data: { step: 2 } },
-    { id: 'AAAAAAAA', data: { step: 3 } },
-    { id: 'BBBBBBBB', data: { step: 3 } },
-  ];
+  // AAAAAAAA と BBBBBBBB を 50 件ずつ
+  const events = ['AAAAAAAA', 'BBBBBBBB'].flatMap(id => Array.from({ length: 50 }, (_, i) => ({ id, data: { step: i + 1 } })));
 
   for (const event of events) {
     await publishEvent(event.id, event.data);
