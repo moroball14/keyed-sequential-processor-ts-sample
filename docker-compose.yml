@@ -11,6 +11,12 @@ services:
       - "8085:8085"
     command: gcloud beta emulators pubsub start --project=local-project --host-port=0.0.0.0:8085
 
+  cloud-tasks-emulator:
+    image: ghcr.io/aertje/cloud-tasks-emulator:latest
+    ports:
+      - "8123:8123"
+    command: ["--port=8123", "--host=0.0.0.0"]
+
   dispatcher:
     build: ./dispatcher
     ports:
@@ -21,9 +27,12 @@ services:
       - PUBSUB_EMULATOR_HOST=pubsub-emulator:8085
       - PUBSUB_PROJECT_ID=local-project
       - WORKER_URL=http://worker:8081
+      - CLOUD_TASKS_EMULATOR_HOST=cloud-tasks-emulator:8123
+      - GOOGLE_CLOUD_PROJECT=local-project
     depends_on:
       - redis
       - pubsub-emulator
+      - cloud-tasks-emulator
 
   worker:
     build: ./worker
@@ -33,8 +42,11 @@ services:
       - PORT=8081
       - REDIS_HOST=redis
       - SELF_URL=http://worker:8081
+      - CLOUD_TASKS_EMULATOR_HOST=cloud-tasks-emulator:8123
+      - GOOGLE_CLOUD_PROJECT=local-project
     depends_on:
       - redis
+      - cloud-tasks-emulator
 
   setup:
     build:
@@ -43,9 +55,12 @@ services:
     working_dir: /usr/src/app
     environment:
       - PUBSUB_EMULATOR_HOST=pubsub-emulator:8085
+      - CLOUD_TASKS_EMULATOR_HOST=cloud-tasks-emulator:8123
+      - GOOGLE_CLOUD_PROJECT=local-project
     command: npm run setup
     depends_on:
       - pubsub-emulator
+      - cloud-tasks-emulator
     profiles:
       - tools
 

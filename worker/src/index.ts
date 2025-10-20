@@ -1,6 +1,6 @@
 import express from 'express';
 import { Redis } from 'ioredis';
-import axios from 'axios';
+import { CloudTasksManager } from './cloudTasks';
 import { RELEASE_LOCK_AND_CHECK_QUEUE, POP_AND_CHECK_QUEUE } from './redisScripts';
 
 const app = express();
@@ -13,6 +13,7 @@ const {
 } = process.env;
 
 const redis = new Redis({ host: REDIS_HOST, port: 6379 });
+const cloudTasks = new CloudTasksManager();
 
 const processBusinessLogic = async (eventId: string, data: string) => {
   const processTime = Math.floor(Math.random() * 2000) + 1000; // 1〜3秒のランダムな処理時間
@@ -44,16 +45,15 @@ const runWorker = async (eventId: string) => {
     RELEASE_LOCK_AND_CHECK_QUEUE,
     2,
     `queue:${eventId}`,
-    `lock:${eventId}`,
-    SELF_URL
+    `lock:${eventId}`
   ) as [string, number];
 
   const [checkAction, queueLength] = checkResult;
 
   if (checkAction === 'continue') {
-    console.log(`[Worker] Found ${queueLength} more tasks for ${eventId}. Chaining next worker.`);
-    axios.post(SELF_URL, { eventId }).catch(err => {
-      console.error(`[Worker] Failed to chain worker for ${eventId}.`, err.message);
+    console.log(`[Worker] Found ${queueLength} more tasks for ${eventId}. Creating next worker task.`);
+    cloudTasks.createWorkerTask(eventId, SELF_URL).catch((err: any) => {
+      console.error(`[Worker] Failed to create next worker task for ${eventId}.`, err.message);
     });
   } else {
     console.log(`[Worker] No more tasks for ${eventId}. Lock released.`);

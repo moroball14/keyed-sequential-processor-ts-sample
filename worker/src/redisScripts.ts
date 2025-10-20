@@ -2,7 +2,6 @@
 export const RELEASE_LOCK_AND_CHECK_QUEUE = `
 local queue_key = KEYS[1]
 local lock_key = KEYS[2]
-local worker_url = ARGV[1]
 
 -- キューの長さをチェック
 local queue_length = redis.call('LLEN', queue_key)
