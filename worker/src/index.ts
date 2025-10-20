@@ -1,7 +1,7 @@
 import express from 'express';
 import { Redis } from 'ioredis';
 import axios from 'axios';
-import { RELEASE_LOCK_AND_CHECK_QUEUE } from './redisScripts';
+import { RELEASE_LOCK_AND_CHECK_QUEUE, POP_AND_CHECK_QUEUE } from './redisScripts';
 
 const app = express();
 app.use(express.json());
@@ -22,17 +22,25 @@ const processBusinessLogic = async (eventId: string, data: string) => {
 };
 
 const runWorker = async (eventId: string) => {
-  const eventData = await redis.rpop(`queue:${eventId}`);
-  if (!eventData) {
-    console.log(`[Worker] Queue for ${eventId} is empty, but worker was invoked. Releasing lock.`);
-    await redis.del(`lock:${eventId}`);
+  // アトミックにキューからデータを取得し、空の場合はロックを解放
+  const popResult = await redis.eval(
+    POP_AND_CHECK_QUEUE,
+    2,
+    `queue:${eventId}`,
+    `lock:${eventId}`
+  ) as [string, string | null];
+
+  const [popAction, eventData] = popResult;
+
+  if (popAction === 'empty' || eventData === null) {
+    console.log(`[Worker] Queue for ${eventId} is empty, but worker was invoked. Lock released by Lua script.`);
     return;
   }
 
   await processBusinessLogic(eventId, eventData);
 
   // アトミックにロック解放とキューチェックを実行
-  const result = await redis.eval(
+  const checkResult = await redis.eval(
     RELEASE_LOCK_AND_CHECK_QUEUE,
     2,
     `queue:${eventId}`,
@@ -40,9 +48,9 @@ const runWorker = async (eventId: string) => {
     SELF_URL
   ) as [string, number];
 
-  const [action, queueLength] = result;
+  const [checkAction, queueLength] = checkResult;
 
-  if (action === 'continue') {
+  if (checkAction === 'continue') {
     console.log(`[Worker] Found ${queueLength} more tasks for ${eventId}. Chaining next worker.`);
     axios.post(SELF_URL, { eventId }).catch(err => {
       console.error(`[Worker] Failed to chain worker for ${eventId}.`, err.message);

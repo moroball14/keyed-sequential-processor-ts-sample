@@ -16,3 +16,21 @@ else
   return { "release", 0 }
 end
 `;
+
+// キューからデータを取得し、空の場合はロックを解放するためのLua Script
+export const POP_AND_CHECK_QUEUE = `
+local queue_key = KEYS[1]
+local lock_key = KEYS[2]
+
+-- キューからデータをpop
+local event_data = redis.call('RPOP', queue_key)
+
+if event_data then
+  -- データが存在する場合、データを返す
+  return { "data", event_data }
+else
+  -- キューが空の場合、ロックを解放
+  redis.call('DEL', lock_key)
+  return { "empty", nil }
+end
+`;
