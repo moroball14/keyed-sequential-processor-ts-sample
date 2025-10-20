@@ -64,3 +64,10 @@ keyed-sequential-processor-ts-sample/
 ├── docker-compose.yml  # ローカル開発環境の定義
 └── package.json        # ルートパッケージ
 ```
+
+## 備考
+
+というか解消できていない懸念
+
+- Worker がクラッシュした場合はロックが永続的に残ってしまい、その ID のイベントが処理されなくなる可能性
+- ネットワーク障害などによって Dispatcher から Worker への HTTP 通信が失敗した場合のリトライ機構がない
