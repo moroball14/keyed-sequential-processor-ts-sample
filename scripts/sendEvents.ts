@@ -12,6 +12,7 @@ async function publishEvent(eventId: string, data: object) {
   const messageId = await pubsub.topic(TOPIC_NAME).publishMessage({
     data: dataBuffer,
     attributes: { eventId },
+    orderingKey: eventId,
   });
   console.log(`Published message ${messageId} for event ID ${eventId}`);
 }
